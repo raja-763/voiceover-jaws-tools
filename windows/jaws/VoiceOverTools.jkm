@@ -16,9 +16,16 @@
 [Common]
 
 ; Item Chooser — Insert+Ctrl+I
-; Lists interactive elements (links, buttons, fields, headings …)
-; and lets you jump straight to one.
+; Lists ALL interactive elements in one filterable list (like VoiceOver VO+I).
 Insert+Ctrl+I=JAWSItemChooser
+
+; ---- Rotor (like VoiceOver VO+U on Mac) ----
+; Insert+U opens the list for the current rotor category.
+; Insert+Ctrl+Left / Right spins the rotor to the previous / next category.
+; Categories cycle through: Links → Headings → Buttons → Form Controls → Tables → Images
+Insert+U=OpenRotor
+Insert+Ctrl+Left=RotorLeft
+Insert+Ctrl+Right=RotorRight
 
 ; VoiceOver Router (PC to JAWS) — Insert+NumPad5
 ; Moves the Windows insertion point to where the JAWS cursor is.

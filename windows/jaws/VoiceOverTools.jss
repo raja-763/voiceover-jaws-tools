@@ -9,6 +9,20 @@
 ;                          Enter to jump, Escape to cancel.
 ;                          Key: Insert+Ctrl+I
 ;
+;   OpenRotor            — VoiceOver Rotor (like VoiceOver VO+U on Mac)
+;                          Opens a category wheel: Links, Headings, Buttons,
+;                          Form Controls, Tables, Images.
+;                          Use Insert+Ctrl+Left/Right to spin the rotor and
+;                          hear the category name.  Press Insert+U to open
+;                          the list for the current category.
+;                          Key: Insert+U
+;
+;   RotorLeft            — Spin rotor to the previous category.
+;                          Key: Insert+Ctrl+Left
+;
+;   RotorRight           — Spin rotor to the next category.
+;                          Key: Insert+Ctrl+Right
+;
 ;   RoutePCCursorToJAWS  — VoiceOver-style cursor router.
 ;                          Moves the Windows insertion point to wherever the
 ;                          JAWS reading cursor currently sits.
@@ -17,7 +31,7 @@
 ;   RouteJAWSToPCCursor  — Reverse router: moves JAWS cursor to PC cursor.
 ;                          Key: Insert+Shift+NumPad5
 ;
-; INSTALLATION — run install.bat or see INSTALL.md for manual steps.
+; INSTALLATION — run install.bat or see INSTALL-JAWS.md for manual steps.
 
 
 ; ================================================================
@@ -175,7 +189,202 @@ EndFunction
 
 
 ; ================================================================
-; Script 2 — VoiceOver Cursor Router
+; ROTOR — Global state
+; g_RotorPos tracks which category the rotor is currently set to.
+; 1=Links  2=Headings  3=Buttons  4=Form Controls  5=Tables  6=Images
+; ================================================================
+Globals
+  Int    g_RotorPos
+EndGlobals
+
+
+; ----------------------------------------------------------------
+; RotorCategoryName — returns the display name for a rotor slot.
+; ----------------------------------------------------------------
+String Function RotorCategoryName(Int iPos)
+  If iPos == 1 Then Return "Links"
+  If iPos == 2 Then Return "Headings"
+  If iPos == 3 Then Return "Buttons"
+  If iPos == 4 Then Return "Form Controls"
+  If iPos == 5 Then Return "Tables"
+  If iPos == 6 Then Return "Images"
+  Return "Links"
+EndFunction
+
+
+; ----------------------------------------------------------------
+; RotorRoleMatch — returns 1 if iRole belongs to rotor slot iPos.
+; ----------------------------------------------------------------
+Int Function RotorRoleMatch(Int iRole, Int iPos)
+  If iPos == 1 Then  ; Links
+    If iRole == ROLE_SYSTEM_LINK Then Return 1
+    Return 0
+  EndIf
+  If iPos == 2 Then  ; Headings (native apps use GROUPING for section headers)
+    If iRole == ROLE_SYSTEM_GROUPING Then Return 1
+    Return 0
+  EndIf
+  If iPos == 3 Then  ; Buttons
+    If iRole == ROLE_SYSTEM_PUSHBUTTON Then Return 1
+    Return 0
+  EndIf
+  If iPos == 4 Then  ; Form Controls
+    If iRole == ROLE_SYSTEM_TEXT        Then Return 1
+    If iRole == ROLE_SYSTEM_CHECKBUTTON Then Return 1
+    If iRole == ROLE_SYSTEM_RADIOBUTTON Then Return 1
+    If iRole == ROLE_SYSTEM_COMBOBOX    Then Return 1
+    If iRole == ROLE_SYSTEM_SPINBUTTON  Then Return 1
+    If iRole == ROLE_SYSTEM_SLIDER      Then Return 1
+    Return 0
+  EndIf
+  If iPos == 5 Then  ; Tables
+    If iRole == ROLE_SYSTEM_TABLE Then Return 1
+    Return 0
+  EndIf
+  If iPos == 6 Then  ; Images
+    If iRole == ROLE_SYSTEM_GRAPHIC Then Return 1
+    Return 0
+  EndIf
+  Return 0
+EndFunction
+
+
+; ----------------------------------------------------------------
+; CollectByCategory — same tree walk as CollectElements but only
+; collects items whose role matches the given rotor slot.
+; ----------------------------------------------------------------
+Void Function CollectByCategory(String sElements[], Int iCount, Int iPos)
+  Var
+    Int    hFocus,
+    Int    hRoot,
+    Int    hChild,
+    String sName,
+    Int    iRole,
+    Int    hParent,
+    Int    hGrand
+
+  Let hFocus = GetFocus()
+  If hFocus == 0 Then Return
+
+  Let hRoot   = hFocus
+  Let hParent = ParentObject(hRoot)
+  While hParent != 0
+    Let hRoot   = hParent
+    Let hParent = ParentObject(hRoot)
+  EndWhile
+
+  Let hChild = FirstObject(hRoot, OT_CHILD)
+  While hChild != 0 And iCount < 490
+    Let sName = GetObjectName(hChild)
+    Let iRole = GetObjectRole(hChild)
+    If StringLength(sName) > 0 Then
+      If RotorRoleMatch(iRole, iPos) Then
+        Let iCount            = iCount + 1
+        Let sElements[iCount] = sName
+      EndIf
+    EndIf
+
+    Let hGrand = FirstObject(hChild, OT_CHILD)
+    While hGrand != 0 And iCount < 490
+      Let sName = GetObjectName(hGrand)
+      Let iRole = GetObjectRole(hGrand)
+      If StringLength(sName) > 0 Then
+        If RotorRoleMatch(iRole, iPos) Then
+          Let iCount            = iCount + 1
+          Let sElements[iCount] = sName
+        EndIf
+      EndIf
+      Let hGrand = NextObject(hGrand, OT_NEXT)
+    EndWhile
+
+    Let hChild = NextObject(hChild, OT_NEXT)
+  EndWhile
+EndFunction
+
+
+; ================================================================
+; Script 4 — Open Rotor (VoiceOver VO+U style)
+; Opens the item list for the current rotor category.
+; Key: Insert+U
+; ================================================================
+Script OpenRotor ()
+  Var
+    String sElements[500],
+    Int    iCount,
+    Int    iSelected,
+    String sCat,
+    String sTitle
+
+  ; Default rotor position to 1 (Links) on first use
+  If g_RotorPos < 1 Or g_RotorPos > 6 Then
+    Let g_RotorPos = 1
+  EndIf
+
+  Let sCat   = RotorCategoryName(g_RotorPos)
+  Let sTitle = "Rotor: " + sCat
+
+  SayMessage(OT_JAWS_MESSAGE,
+    sCat + ". Up and down arrows to browse. Enter to jump. Use Insert+Ctrl+Left or Right to change category.",
+    sCat)
+
+  Let iCount = 0
+  Call CollectByCategory(sElements, iCount, g_RotorPos)
+
+  If iCount == 0 Then
+    SayMessage(OT_JAWS_MESSAGE, "No " + sCat + " found on this screen.", "No " + sCat)
+    Return
+  EndIf
+
+  Let iSelected = SelectList(sTitle, sElements, iCount)
+
+  If iSelected >= 1 Then
+    SayMessage(OT_JAWS_MESSAGE, "Navigated to: " + sElements[iSelected], "")
+  EndIf
+EndScript
+
+
+; ================================================================
+; Script 5 — Spin Rotor Left (previous category)
+; Key: Insert+Ctrl+Left
+; ================================================================
+Script RotorLeft ()
+  If g_RotorPos < 1 Or g_RotorPos > 6 Then
+    Let g_RotorPos = 1
+  EndIf
+
+  Let g_RotorPos = g_RotorPos - 1
+  If g_RotorPos < 1 Then
+    Let g_RotorPos = 6
+  EndIf
+
+  SayMessage(OT_JAWS_MESSAGE,
+    "Rotor: " + RotorCategoryName(g_RotorPos) + ". Press Insert+U to browse.",
+    RotorCategoryName(g_RotorPos))
+EndScript
+
+
+; ================================================================
+; Script 6 — Spin Rotor Right (next category)
+; Key: Insert+Ctrl+Right
+; ================================================================
+Script RotorRight ()
+  If g_RotorPos < 1 Or g_RotorPos > 6 Then
+    Let g_RotorPos = 1
+  EndIf
+
+  Let g_RotorPos = g_RotorPos + 1
+  If g_RotorPos > 6 Then
+    Let g_RotorPos = 1
+  EndIf
+
+  SayMessage(OT_JAWS_MESSAGE,
+    "Rotor: " + RotorCategoryName(g_RotorPos) + ". Press Insert+U to browse.",
+    RotorCategoryName(g_RotorPos))
+EndScript
+
+
+; ================================================================
+; Script 7 — VoiceOver Cursor Router
 ; Moves the Windows PC cursor to wherever the JAWS cursor sits.
 ; This is the JAWS equivalent of VoiceOver cursor routing.
 ; Key: Insert+NumPad5
@@ -188,7 +397,7 @@ EndScript
 
 
 ; ================================================================
-; Script 3 — Reverse Router
+; Script 9 — Reverse Router
 ; Moves the JAWS cursor to the Windows PC cursor position.
 ; Key: Insert+Shift+NumPad5
 ; ================================================================
