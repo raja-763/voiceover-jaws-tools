@@ -1,0 +1,29 @@
+; VoiceOverTools.jkm
+; Key-map file for VoiceOverTools.jss
+;
+; This file assigns keyboard shortcuts to the three scripts.
+; You can change any shortcut by editing the right-hand value and
+; re-compiling (or restarting JAWS).
+;
+; Key syntax:
+;   Insert = JAWSKey (the standard JAWS modifier)
+;   NumPad digits are written as Num0..Num9, NumPadPlus, etc.
+;
+; ---------------------------------------------------------------
+; SECTION: Common — shortcuts active in all JAWS cursor modes
+; ---------------------------------------------------------------
+
+[Common]
+
+; Item Chooser — Insert+Ctrl+I
+; Lists interactive elements (links, buttons, fields, headings …)
+; and lets you jump straight to one.
+Insert+Ctrl+I=JAWSItemChooser
+
+; VoiceOver Router (PC to JAWS) — Insert+NumPad5
+; Moves the Windows insertion point to where the JAWS cursor is.
+Insert+Num5=RoutePCCursorToJAWS
+
+; Reverse router (JAWS to PC) — Insert+Shift+NumPad5
+; Moves the JAWS cursor to where the Windows insertion point is.
+Insert+Shift+Num5=RouteJAWSToPCCursor
